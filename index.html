@@ -1,0 +1,221 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <title>CSP Final Project</title>
+    <canvas id="canvas"></canvas>
+    <input id="input" autofocus />
+    <h1 style="text-align: center;">Type the words on the screen before they reach the bottom!</h1>
+    <style>
+        #canvas {
+            outline: 3px solid black;
+            display: block;
+            margin: auto;
+        }
+        #input {
+            display: block;
+            margin: auto;
+            font-size: 48px;
+        }
+    </style>
+    <script>
+        const canvas = document.getElementById("canvas")
+        const ctx = canvas.getContext("2d")
+
+
+        const canvasWidth = 800
+        const canvasHeight = 500
+        canvas.width = canvasWidth
+        canvas.height = canvasHeight
+        const FPS = 60
+
+
+        // 500 most common English words (I only used words with less than 6 letters): https://tk.cusd.com/downloads/500highfrequencywords1.pdf
+        const words = ["a","able","about","above","add","after","again","ago","air","all","alone","along","also","am","among","an","and","any","are","area","as","asked","at","away","back","ball","be","been","began","begin","being","below","bet","big","black","blue","boat","body","book","both","box","boy","bring","build","built","but","by","came","can","car","care","carry","check","city","class","close","cold","come","could","cut","dark","day","deep","did","do","does","dog","done","door","down","draw","dry","each","early","earth","easy","eat","else","end","even","ever","every","face","fact","fall","far","fast","feel","feet","felt","few","field","find","fine","fire","first","fish","five","floor","food","foot","for","form","found","four","from","front","full","game","gave","get","girl","give","glass","go","going","gold","gone","good","got","great","green","group","grow","had","half","hand","hard","has","have","he","head","hear","heard","heart","heavy","held","help","her","here","high","him","his","hold","home","horse","hot","hour","house","how","I","ice","idea","if","in","into","is","it","its","job","just","keep","kept","kind","knew","know","land","large","last","later","lay","learn","least","leave","left","less","let","life","light","like","line","list","live","lived","long","look","low","made","main","make","man","many","map","may","me","mean","men","might","mind","miss","money","moon","more","most","move","much","must","my","name","near","need","never","new","next","night","no","not","now","of","off","often","oh","old","on","once","one","only","open","or","order","other","our","out","over","own","page","paper","part","past","piece","place","play","point","poor","power","put","quite","rain","ran","read","ready","real","red","rest","right","river","road","rock","room","round","run","sad","said","same","sat","saw","say","sea","see","seen","set","shall","she","ship","short","show","shown","side","since","six","size","sky","small","snow","so","some","soon","sound","space","stand","start","state","stay","still","stood","stop","story","study","such","sun","sure","table","take","talk","tall","tell","ten","than","that","the","their","them","then","there","these","they","thing","think","third","this","those","three","time","tiny","to","today","told","too","took","top","town","tree","true","try","turn","two","under","until","up","upon","us","use","very","voice","walk","want","warm","was","watch","water","way","we","well","went","were","what","when","where","which","while","white","who","whole","why","wide","wild","will","wind","with","words","work","world","would","write","year","yes","yet","you","young","your"]
+
+
+        let game
+        let player
+        let targets
+
+
+        const targetTypes = {
+            enemy: {
+                size: 50,
+                color: "pink",
+                onDestroyed: () => {
+                    game.score++
+                    if (!game.isSlowed) {
+                        game.currentSpeed += game.targetSpeedIncrease
+                    }
+                }
+            },
+
+
+            freezePowerUp: {
+                size: 50,
+                color: "cyan",
+                onDestroyed: () => {
+                    game.isSlowed = true
+                    setTimeout(() => {
+                        game.isSlowed = false
+                    }, 3000)
+                }
+            },
+
+
+            pushBackPowerUp: {
+                size: 50,
+                color: "lime",
+                onDestroyed: () => {
+                    for (let target of targets) {
+                        target.y -= game.currentSpeed;
+                    }
+                }
+            },
+        }
+
+
+        onkeyup = (e) => {
+            if (!game.isOver) {
+                let input = document.getElementById("input").value
+                let target = findTargetWithWord(input);
+                if (target) {
+                    const index = targets.indexOf(target)
+                    targets.splice(index, 1)
+                    target.onDestroyed()
+                    document.getElementById("input").value = ""
+                }
+            }
+
+
+            if (e.key === " " && game.isOver) {
+                reset()
+            }
+        }
+
+
+        function reset() {
+            game = {
+                score: 0,
+                isOver: false,
+                isSlowed: false,
+                currentSpeed: 100,
+                slowedSpeed: 50,
+                numberOfTargets: 3,
+                targetSpeedIncrease: 3,
+            }
+
+
+            player = {
+                x: canvasWidth / 2,
+                y: canvasHeight - 50,
+                size: 50,
+                color: "green"
+            }
+
+
+            targets = []
+            document.getElementById("input").value = ""
+        }
+
+
+        function targetFactory(targetType) {
+            let target = Object.assign({}, targetType)
+            target.x = randomBetween(target.size, canvasWidth - target.size)
+            target.y = -target.size / 2
+            target.word = getRandomItemFromArray(words)
+            return target
+        }
+
+
+        function fillSquareCentered(square) {
+            ctx.fillStyle = square.color
+            ctx.fillRect(square.x - square.size / 2, square.y - square.size / 2, square.size, square.size)
+        }
+
+
+        function fillTextCentered(x, y, textString, fontSize, color) {
+            ctx.textAlign = "center"
+            ctx.font = `bold ${fontSize}px Verdana`
+            ctx.fillStyle = color
+            ctx.fillText(textString, x, y)
+        }
+
+
+        function randomBetween(min, max) {
+            return Math.random() * (max - min) + min
+        }
+
+
+        function getRandomItemFromArray(array) {
+            return array[Math.floor(randomBetween(0, array.length))]
+        }
+
+
+        function findTargetWithWord(text) {
+            for (let target of targets) {
+                if (text.trim() === target.word) {
+                    return target
+                }
+            }
+
+            return false
+        }
+
+
+        function moveAndDrawTarget(target) {
+            target.y += (game.isSlowed ? game.slowedSpeed : game.currentSpeed) / FPS
+            fillSquareCentered(target)
+            fillTextCentered(target.x, target.y, target.word, 12, "black")
+        }
+
+
+        function isTargetOffScreen(target) {
+            return target.y >= canvasHeight + target.size / 2
+        }
+
+
+        function gameLoop() {
+            ctx.clearRect(0, 0, canvasWidth, canvasHeight)
+            window.requestAnimationFrame(gameLoop)
+
+
+            if (game.isOver) {
+                fillTextCentered(canvasWidth / 2, canvasHeight / 2 - 100, "GAME OVER!", 72, "black")
+                fillTextCentered(canvasWidth / 2, canvasHeight / 2, `SCORE: ${game.score}`, 48, "black")
+                fillTextCentered(canvasWidth / 2, canvasHeight / 2 + 75, "Press SPACE To Restart", 36, "black")
+                return
+            }
+
+
+            while (targets.length < game.numberOfTargets) {
+                let probability = Math.random()
+                if (probability <= 1/20) {
+                    targets.push(targetFactory(targetTypes.freezePowerUp))
+                } else if (probability <= 1/10) {
+                    targets.push(targetFactory(targetTypes.pushBackPowerUp))
+                } else {
+                    targets.push(targetFactory(targetTypes.enemy))
+                }
+            }
+
+
+            for (let target of targets) {
+                moveAndDrawTarget(target)
+                if (isTargetOffScreen(target)) {
+                    game.isOver = true
+                }
+            }
+
+
+            fillTextCentered(canvasWidth / 2, 50, game.score, 36, "black")
+        }
+
+
+        reset()
+        window.requestAnimationFrame(gameLoop)
+
+
+    </script>
+</head>
+</html>
